@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-macos-dmg:
@@ -51,3 +51,12 @@ jobs:
           path: release/*.dmg
           if-no-files-found: error
           retention-days: 30
+
+      - name: Publish MacBook DMG release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0
+          name: Jarvis AI for Mac v0.1.0
+          prerelease: true
+          generate_release_notes: true
+          files: release/*.dmg
