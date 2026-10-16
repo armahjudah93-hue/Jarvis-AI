@@ -1,0 +1,56 @@
+{
+  "name": "jarvis-ai-mac",
+  "version": "0.1.0",
+  "description": "A privacy-minded Jarvis desktop assistant for MacBooks.",
+  "main": "electron/main.cjs",
+  "author": "Jarvis AI",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "dist:mac": "electron-builder --mac dmg --universal --publish never",
+    "verify": "node --check app.js && node --check electron/main.cjs && node --check electron/preload.cjs"
+  },
+  "build": {
+    "appId": "ai.jarvis.desktop",
+    "productName": "Jarvis AI",
+    "artifactName": "Jarvis-AI-${version}-${arch}.${ext}",
+    "files": [
+      "index.html",
+      "styles.css",
+      "app.js",
+      "electron/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "darkModeSupport": true
+    },
+    "dmg": {
+      "title": "Jarvis AI",
+      "backgroundColor": "#080a11",
+      "window": {
+        "width": 540,
+        "height": 370
+      }
+    }
+  },
+  "devDependencies": {
+    "electron": "44.8.0",
+    "electron-builder": "26.15.3"
+  }
+}

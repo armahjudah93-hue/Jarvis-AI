@@ -385,5 +385,28 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape') { closeModal(settingsModal); if (confirmationModal.classList.contains('open')) declinePending(); }
 });
 
+async function initializeDesktopShell() {
+  if (!window.jarvisDesktop) return;
+
+  document.body.classList.add('native-mac-app');
+  $('#downloadMacApp').style.display = 'none';
+
+  try {
+    const desktop = await window.jarvisDesktop.getInfo();
+    $('.crumb').innerHTML = `<span class="status-dot"></span><span>MacBook companion</span><span class="divider">/</span><span>macOS ${escapeHTML(desktop.release)}</span>`;
+    $('.privacy-card strong').textContent = 'MacBook native app';
+    $('.privacy-card span').textContent = `macOS ${desktop.release} · local companion`;
+  } catch {
+    // The desktop shell can still render the local UI if version info is unavailable.
+  }
+
+  window.jarvisDesktop.onFocusCommand(() => {
+    commandInput.focus();
+    commandBar.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  window.jarvisDesktop.onOpenSettings(() => openModal(settingsModal));
+}
+
 initializeVoiceRecognition();
 displayQueue();
+initializeDesktopShell();

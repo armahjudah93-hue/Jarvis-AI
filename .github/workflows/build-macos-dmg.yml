@@ -1,0 +1,53 @@
+name: Build signed-ready macOS DMG
+
+on:
+  push:
+    branches:
+      - arena/151a1a6d-jarvis-ai
+    paths:
+      - "app.js"
+      - "index.html"
+      - "styles.css"
+      - "electron/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/build-macos-dmg.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-macos-dmg:
+    name: Build universal MacBook app
+    runs-on: macos-14
+    timeout-minutes: 25
+    steps:
+      - name: Check out app
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify desktop shell
+        run: npm run verify
+
+      - name: Package universal DMG
+        run: npm run dist:mac
+        env:
+          # The distributable is unsigned until Apple Developer signing credentials are added.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Jarvis-AI-MacBook-DMG
+          path: release/*.dmg
+          if-no-files-found: error
+          retention-days: 30

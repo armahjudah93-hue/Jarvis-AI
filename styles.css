@@ -121,7 +121,8 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .crumb { color: #676b7c; font-family: var(--mono); font-size: 10px; letter-spacing: .01em; display: flex; align-items: center; gap: 8px; }
 .status-dot, .live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(105,216,170,.08), 0 0 11px rgba(105,216,170,.8); }
 .divider { color: #343846; margin: 0 2px; }
-.top-actions { display: flex; gap: 9px; }
+.top-actions { display: flex; gap: 9px; align-items: center; }
+.mac-download { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; color: #c6b4ff; border: 1px solid rgba(173, 145, 255, .24); border-radius: 9px; background: rgba(147, 109, 237, .08); text-decoration: none; font-size: 9px; font-weight: 800; letter-spacing: .01em; transition: .2s; }.mac-download svg { width: 15px; height: 15px; }.mac-download em { color: #8173ac; font-family: var(--mono); font-style: normal; font-size: 8px; }.mac-download:hover { color: #f2efff; border-color: rgba(185,157,255,.55); background: rgba(147,109,237,.16); }
 .icon-button { border: 1px solid rgba(182,188,223,.1); background: rgba(255,255,255,.018); height: 32px; width: 32px; border-radius: 9px; color: #a5a8ba; display: grid; place-items: center; transition: .2s; }
 .icon-button svg { width: 17px; height: 17px; }
 .icon-button:hover, .icon-button.active { color: #eeeaff; border-color: rgba(170,142,255,.4); background: rgba(139, 105, 237, .12); }
