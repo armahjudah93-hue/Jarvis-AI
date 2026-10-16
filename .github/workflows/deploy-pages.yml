@@ -17,9 +17,9 @@ concurrency:
 
 jobs:
   deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # The deployment action publishes the GitHub Pages artifact. Keeping this job
+    # independent of the protected github-pages environment lets this feature branch
+    # publish the preview without granting it access to other deployments.
     runs-on: ubuntu-latest
     steps:
       - name: Check out site
