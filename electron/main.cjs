@@ -1,8 +1,10 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, session } = require('electron');
 const path = require('path');
+const { startJarvisServer } = require('../backend/src/server.cjs');
 
 const isMac = process.platform === 'darwin';
 let mainWindow;
+let localServer;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -15,7 +17,7 @@ function createWindow() {
     show: false,
     titleBarStyle: 'hiddenInset',
     // Place native traffic lights in the top bar, clear of the Jarvis brand in the sidebar.
-    trafficLightPosition: { x: 261, y: 17 }, 
+    trafficLightPosition: { x: 261, y: 17 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -24,7 +26,7 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, '..', 'index.html'));
+  mainWindow.loadURL(localServer.url);
   mainWindow.once('ready-to-show', () => mainWindow.show());
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -74,7 +76,7 @@ function buildMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (!isMac) {
     dialog.showErrorBox('MacBook app only', 'Jarvis AI is packaged for macOS and can only run on a MacBook or other Mac.');
     app.quit();
@@ -82,17 +84,29 @@ app.whenReady().then(() => {
   }
 
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    // Microphone access is requested only by the visible voice-input action.
-    // Every other browser permission is denied by default.
+    // Media permission is requested only from the visible voice or future webcam flows.
+    // All other browser permissions are denied by default.
     callback(permission === 'media');
   });
 
-  buildMenu();
-  createWindow();
+  try {
+    // The API is loopback-only and is started by the native app; it is never exposed to the LAN.
+    localServer = await startJarvisServer({ port: 0, host: '127.0.0.1' });
+    buildMenu();
+    createWindow();
+  } catch (error) {
+    dialog.showErrorBox('JARVIS could not start', `The protected local service failed to start.\n\n${error.message}`);
+    app.quit();
+    return;
+  }
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0 && localServer) createWindow();
   });
+});
+
+app.on('before-quit', () => {
+  localServer?.server.close();
 });
 
 app.on('window-all-closed', () => {

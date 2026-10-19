@@ -1,6 +1,6 @@
 {
   "name": "jarvis-ai-mac",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A privacy-minded Jarvis desktop assistant for MacBooks.",
   "main": "electron/main.cjs",
   "author": "Jarvis AI",
@@ -9,8 +9,10 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
+    "server": "node backend/src/server.cjs",
     "dist:mac": "electron-builder --mac dmg --universal --publish never",
-    "verify": "node --check app.js && node --check electron/main.cjs && node --check electron/preload.cjs"
+    "verify": "node --check app.js && node --check api.js && node --check electron/main.cjs && node --check electron/preload.cjs && node --check backend/src/server.cjs && node --check backend/src/orchestrator.cjs",
+    "test": "node --test tests/**/*.test.cjs"
   },
   "build": {
     "appId": "ai.jarvis.desktop",
@@ -20,7 +22,9 @@
       "index.html",
       "styles.css",
       "app.js",
+      "api.js",
       "electron/**/*",
+      "backend/**/*",
       "package.json"
     ],
     "directories": {
@@ -48,6 +52,15 @@
         "height": 370
       }
     }
+  },
+  "dependencies": {
+    "cors": "2.8.6",
+    "dotenv": "18.0.8",
+    "express": "5.3.0",
+    "express-rate-limit": "8.7.1",
+    "helmet": "8.3.0",
+    "multer": "2.4.0",
+    "openai": "7.39.0"
   },
   "devDependencies": {
     "electron": "44.8.0",

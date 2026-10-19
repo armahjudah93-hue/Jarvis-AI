@@ -167,25 +167,117 @@ function executePlan(command, plan) {
   }, plan.kind === 'analysis' ? 1500 : 1000);
 }
 
-function submitCommand() {
+const conversationHistory = JSON.parse(localStorage.getItem('jarvis-conversation-history') || '[]').slice(-12);
+const activeTimers = new Map();
+let isSendingCommand = false;
+
+function planForBackendAction(action) {
+  const name = action?.name || 'conversation';
+  if (name === 'create_timer') return { icon: 'focus', detail: 'Waiting for the local timer to start', kind: 'timer' };
+  if (name === 'calculate') return { icon: 'spark', detail: 'Calculating with the protected math engine', kind: 'calculation' };
+  if (name === 'get_time') return { icon: 'focus', detail: 'Reading the trusted system clock', kind: 'time' };
+  if (name === 'search_web') return { icon: 'analyze', detail: 'Retrieving sourced web results', kind: 'search' };
+  return { icon: 'spark', detail: 'Asking the configured JARVIS backend', kind: 'conversation' };
+}
+
+function saveHistory(userMessage, assistantMessage) {
+  conversationHistory.push({ role: 'user', content: userMessage }, { role: 'assistant', content: assistantMessage });
+  conversationHistory.splice(0, Math.max(0, conversationHistory.length - 12));
+  localStorage.setItem('jarvis-conversation-history', JSON.stringify(conversationHistory));
+}
+
+function formatTimer(seconds) {
+  const minutes = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const remainder = (seconds % 60).toString().padStart(2, '0');
+  return `${minutes}:${remainder}`;
+}
+
+function startRealTimer(timer, commandItem) {
+  const endsAt = Date.now() + timer.durationSeconds * 1000;
+  const update = () => {
+    const remaining = Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+    if (remaining <= 0) {
+      window.clearInterval(interval);
+      activeTimers.delete(commandItem.id);
+      updateQueueItem(commandItem.id, { status: 'COMPLETE', detail: `${timer.label} finished.` });
+      addActivity('Timer completed', `${timer.label} · ${formatTimer(timer.durationSeconds)}`, 'purple');
+      showToast('Timer complete', `${timer.label} has finished.`, 'spark');
+      speak(`${timer.label} is complete.`);
+      return;
+    }
+    updateQueueItem(commandItem.id, { status: formatTimer(remaining), detail: `${timer.label} is running on this device` });
+  };
+  const interval = window.setInterval(update, 1000);
+  activeTimers.set(commandItem.id, interval);
+  update();
+}
+
+function resultDetail(action, message) {
+  if (!action?.result) return message;
+  if (action.name === 'calculate') return `${action.result.expression} = ${action.result.formatted}`;
+  if (action.name === 'get_time') return action.result.formatted;
+  if (action.name === 'search_web') {
+    const sources = (action.result.results || []).slice(0, 2).map(result => result.title).filter(Boolean);
+    return sources.length ? sources.join(' · ') : message;
+  }
+  return message;
+}
+
+function setCommandBusy(busy) {
+  isSendingCommand = busy;
+  runCommand.disabled = busy;
+  runCommand.innerHTML = busy ? 'Working <span>···</span>' : 'Run <span>↵</span>';
+  commandBar.classList.toggle('is-busy', busy);
+}
+
+async function submitCommand() {
   const command = commandInput.value.trim();
-  if (!command) {
-    commandBar.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }], { duration: 250 });
-    commandInput.focus();
+  if (!command || isSendingCommand) {
+    if (!command) {
+      commandBar.animate([{ transform: 'translateX(0)' }, { transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'translateX(0)' }], { duration: 250 });
+      commandInput.focus();
+    }
     return;
   }
-  const plan = parseCommand(command);
+  if (!window.JarvisApi) {
+    showToast('Backend client unavailable', 'Reload JARVIS or launch the Mac app again.', 'shield');
+    return;
+  }
+
+  const item = addQueueItem(command, { icon: 'spark', detail: 'Sending a validated request to JARVIS', kind: 'conversation' }, 'THINKING');
   commandInput.value = '';
   clearCommand.classList.remove('visible');
-  if (plan.kind === 'protected') {
-    pendingAction = { command, plan };
-    $('#modalTitle').textContent = plan.title;
-    $('#modalDescription').textContent = plan.detail;
-    $('#actionPreview').textContent = plan.preview;
-    openModal(confirmationModal);
-    return;
+  setCommandBusy(true);
+
+  try {
+    const response = await window.JarvisApi.sendCommand(command, conversationHistory);
+    const actionPlan = planForBackendAction(response.action);
+    updateQueueItem(item.id, { icon: actionPlan.icon, detail: actionPlan.detail });
+
+    if (response.status === 'requires_client_action' && response.action?.name === 'create_timer') {
+      startRealTimer(response.action.result, item);
+      addActivity('Timer started', `${response.action.result.label} · ${formatTimer(response.action.result.durationSeconds)}`, 'purple');
+      showToast('Timer started', `${formatTimer(response.action.result.durationSeconds)} is now running on this device.`, 'spark');
+    } else {
+      const detail = resultDetail(response.action, response.message);
+      updateQueueItem(item.id, { status: 'DONE', detail });
+      addActivity(response.action?.name === 'search_web' ? 'Web search completed' : 'JARVIS completed a request', detail, response.action?.name === 'search_web' ? 'blue' : 'purple');
+      showToast(response.orchestrator === 'openai' ? 'JARVIS response' : 'Local tool result', response.message, response.action?.name === 'search_web' ? 'analyze' : 'spark');
+      speak(response.message);
+      window.setTimeout(() => {
+        queue = queue.filter(queued => queued.id !== item.id);
+        saveQueue();
+        displayQueue();
+      }, 6000);
+    }
+    saveHistory(command, response.message);
+  } catch (error) {
+    updateQueueItem(item.id, { status: 'ERROR', icon: 'shield', detail: error.message || 'No action was taken.' });
+    addActivity('Command not completed', error.message || 'The backend rejected the request.', 'gold');
+    showToast('No action was taken', error.message || 'JARVIS could not complete that request.', 'shield');
+  } finally {
+    setCommandBusy(false);
   }
-  executePlan(command, plan);
 }
 
 function openModal(modal) {
@@ -266,7 +358,7 @@ function bytesToSize(bytes) {
   return `${(bytes / 1024 ** index).toFixed(index ? 1 : 0)} ${sizes[index]}`;
 }
 
-function analyzeFile(file) {
+async function analyzeFile(file) {
   const dropzoneContent = $('#dropzoneContent');
   const isImage = file.type.startsWith('image/');
   const preview = isImage ? `<img alt="" src="${URL.createObjectURL(file)}">` : `<span>${file.name.split('.').pop().slice(0, 4).toUpperCase()}</span>`;
@@ -276,16 +368,28 @@ function analyzeFile(file) {
     resetFileDrop();
   });
 
-  const plan = { icon: 'analyze', detail: 'Extracting structure, text, and visual signals', kind: 'analysis', outcome: `Finished analyzing ${file.name}. Ask Jarvis a follow-up question anytime.` };
-  const item = addQueueItem(`Analyze ${file.name}`, plan, 'ANALYZING');
-  showToast('Analysis started', 'Reading text, layout, and visual context privately.', 'analyze');
+  if (!window.JarvisApi) {
+    showToast('Backend client unavailable', 'Launch the Mac app again before uploading a file.', 'shield');
+    return;
+  }
 
-  window.setTimeout(() => {
-    updateQueueItem(item.id, { status: 'READY', detail: 'Insights are ready to discuss' });
-    addActivity('New file analyzed', `${file.name} · ready for questions`, 'blue');
-    showToast('Analysis ready', `Jarvis has prepared an overview of ${file.name}.`, 'analyze');
-    speak(`I have finished analyzing ${file.name}. What would you like to know?`);
-  }, 1400);
+  const item = addQueueItem(`Analyze ${file.name}`, { icon: 'analyze', detail: 'Uploading to the protected local analysis service', kind: 'analysis' }, 'ANALYZING');
+  showToast('Analysis started', 'JARVIS is reading this file through the local service.', 'analyze');
+
+  try {
+    const response = await window.JarvisApi.analyzeFile(file);
+    const result = response.action.result;
+    let detail = `${result.kind} · ${bytesToSize(result.bytes)}`;
+    if (result.kind === 'text') detail = `${result.lines} lines · ${result.characters} characters`;
+    if (result.kind === 'csv') detail = `${result.rows} rows · ${result.columns.length} columns`;
+    updateQueueItem(item.id, { status: 'READY', detail });
+    addActivity('File analyzed locally', `${result.fileName} · ${detail}`, 'blue');
+    showToast('Analysis ready', response.message, 'analyze');
+    speak(response.message);
+  } catch (error) {
+    updateQueueItem(item.id, { status: 'ERROR', icon: 'shield', detail: error.message || 'File analysis failed.' });
+    showToast('File not analyzed', error.message || 'The local analysis service rejected the file.', 'shield');
+  }
 }
 
 function resetFileDrop() {
@@ -407,6 +511,20 @@ async function initializeDesktopShell() {
   window.jarvisDesktop.onOpenSettings(() => openModal(settingsModal));
 }
 
+async function initializeBackendStatus() {
+  if (!window.JarvisApi) return;
+  try {
+    const health = await window.JarvisApi.health();
+    const mode = health.aiConfigured ? 'AI routing ready' : health.localFallback ? 'Local tools ready' : 'AI key required';
+    const platform = window.jarvisDesktop ? 'MacBook app' : 'Backend connected';
+    $('.crumb').innerHTML = `<span class="status-dot"></span><span>${platform}</span><span class="divider">/</span><span>${mode}</span>`;
+    $('.system-readout span:nth-child(2)').textContent = health.aiConfigured ? 'AI backend secured' : 'Approved local tools online';
+  } catch {
+    $('.crumb').innerHTML = '<span class="status-dot offline"></span><span>Backend unavailable</span><span class="divider">/</span><span>No command was sent</span>';
+    $('.system-readout span:nth-child(2)').textContent = 'Backend connection required';
+  }
+}
+
 initializeVoiceRecognition();
 displayQueue();
-initializeDesktopShell();
+initializeDesktopShell().finally(initializeBackendStatus);

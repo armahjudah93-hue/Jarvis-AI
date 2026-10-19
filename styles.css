@@ -119,7 +119,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .main-content { width: min(1280px, 100%); padding: 0 57px 30px; margin: 0 auto; }
 .topbar { height: 84px; display: flex; align-items: center; justify-content: space-between; }
 .crumb { color: #676b7c; font-family: var(--mono); font-size: 10px; letter-spacing: .01em; display: flex; align-items: center; gap: 8px; }
-.status-dot, .live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(105,216,170,.08), 0 0 11px rgba(105,216,170,.8); }
+.status-dot, .live-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(105,216,170,.08), 0 0 11px rgba(105,216,170,.8); }.status-dot.offline { background: #e6a060; box-shadow: 0 0 0 4px rgba(230,160,96,.08), 0 0 11px rgba(230,160,96,.45); }
 .divider { color: #343846; margin: 0 2px; }
 .top-actions { display: flex; gap: 9px; align-items: center; }
 .mac-download { height: 32px; display: inline-flex; align-items: center; gap: 6px; padding: 0 9px; color: #c6b4ff; border: 1px solid rgba(173, 145, 255, .24); border-radius: 9px; background: rgba(147, 109, 237, .08); text-decoration: none; font-size: 9px; font-weight: 800; letter-spacing: .01em; transition: .2s; }.mac-download svg { width: 15px; height: 15px; }.mac-download em { color: #8173ac; font-family: var(--mono); font-style: normal; font-size: 8px; }.mac-download:hover { color: #f2efff; border-color: rgba(185,157,255,.55); background: rgba(147,109,237,.16); }
@@ -137,7 +137,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 
 .command-bar-wrap { margin-top: 29px; }
 .command-bar { height: 62px; border: 1px solid rgba(171, 157, 238, .3); background: linear-gradient(105deg, rgba(26,25,45,.93), rgba(18,20,34,.94)); box-shadow: 0 0 0 4px rgba(124,92,224,.035), 0 17px 45px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.045); border-radius: 14px; display: flex; align-items: center; padding: 0 8px 0 20px; transition: border-color .2s, box-shadow .2s; }
-.command-bar:focus-within { border-color: rgba(180,154,255,.7); box-shadow: 0 0 0 4px rgba(142,109,255,.1), 0 17px 45px rgba(0,0,0,.2); }
+.command-bar:focus-within { border-color: rgba(180,154,255,.7); box-shadow: 0 0 0 4px rgba(142,109,255,.1), 0 17px 45px rgba(0,0,0,.2); }.command-bar.is-busy { border-color: rgba(111, 172, 255, .58); }.run-command:disabled { cursor: wait; opacity: .7; filter: saturate(.6); transform: none; }
 .command-symbol { color: #ad8bff; font-family: var(--mono); font-size: 23px; margin-right: 12px; }
 .command-bar input { min-width: 30px; flex: 1; color: #eceaf5; border: 0; outline: 0; background: transparent; font-size: 13px; font-weight: 500; }
 .command-bar input::placeholder { color: #77798d; }

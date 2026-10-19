@@ -1,99 +1,139 @@
 # JARVIS AI — MacBook Desktop Assistant
 
-A native macOS app shell for a private, Jarvis-style desktop assistant. It wraps the command center in Electron, uses native macOS menus and window controls, exposes a MacBook-only runtime, and is packaged as a universal `.dmg` for Apple Silicon and Intel Macs.
+JARVIS is a **MacBook-only** desktop assistant with a secure local backend. The Electron app starts a loopback-only Node/Express service, sends commands through one validated API, and returns the result of an actual approved tool—not a simulated success message.
 
-> **MacBook only.** The distributed app checks for macOS at launch; it is not packaged for Windows or Linux.
->
-> This first release intentionally **does not execute operating-system commands**. The app demonstrates the guarded command and analysis experience while simulating dispatch to a future, permission-scoped local companion. Real automation must be implemented behind explicit macOS permissions and safety confirmations—not by passing free-form text to a shell.
+The public GitHub Pages site remains a UI preview. It has no API keys and cannot perform backend work. The downloadable Mac app starts the protected local service itself.
 
-## Install the Mac app
+## What works in Version 2
 
-1. Download the latest **Jarvis AI universal `.dmg`** from the project [Releases page](https://github.com/armahjudah93-hue/Jarvis-AI/releases/latest).
-2. Open the DMG and drag **Jarvis AI** into **Applications**.
-3. Launch it from Applications. The first unsigned build may require **Control-click → Open** in Finder; that is expected until the app is signed and notarized with an Apple Developer certificate.
+| Tool | Real behavior | Risk policy |
+| --- | --- | --- |
+| `get_time` | Reads the server runtime clock with an optional IANA time zone. | Low — executes directly |
+| `create_timer` | The backend validates duration; the visible client timer starts and counts down on the Mac. | Low — executes directly |
+| `calculate` | Evaluates arithmetic with a bounded parser—never `eval` or generated code. | Low — executes directly |
+| `search_web` | Uses DuckDuckGo Instant Answers and returns sourced result URLs when available. | Low — executes directly |
+| `analyze_file` | Uploads a selected file to the local service for size/type validation, SHA-256 fingerprinting, and real text/CSV/JSON structure analysis. | Low — user-selected input only |
 
-The DMG is built on a macOS GitHub Actions runner by `.github/workflows/build-macos-dmg.yml` and supports both Apple Silicon and Intel Macs.
+With `OPENAI_API_KEY` configured on the backend, OpenAI's Responses API decides whether an approved tool should run. The backend validates the model's structured function arguments before execution. If there is no model key, a deliberately limited local router handles only the approved timer, clock, calculator, and search patterns; the UI labels the result as a **local tool result** rather than claiming an AI model was used.
 
-## Run it locally on a Mac
+**Not implemented:** app launching, shell commands, filesystem mutation, messaging, purchases, system settings, and arbitrary desktop automation. JARVIS declines those requests; no action is taken.
+
+## Download and install for macOS
+
+1. Download the latest **universal `.dmg`** from [Releases](https://github.com/armahjudah93-hue/Jarvis-AI/releases/latest).
+2. Open the DMG and drag **Jarvis AI** to **Applications**.
+3. Launch it from Applications.
+
+The DMG supports both Apple Silicon and Intel Macs. It is not currently signed or notarized. On first launch, macOS may require **Control-click → Open** in Finder. Code signing and notarization need an Apple Developer certificate and are intentionally not bypassed.
+
+## Architecture
+
+```text
+Mac desktop UI (Electron / browser UI)
+                  │ same-origin HTTPS-style API contract
+                  ▼
+       Loopback-only Express backend (127.0.0.1)
+    validation → model tool choice → allowlisted tool
+                  │
+        ┌─────────┴──────────────────────────┐
+        ▼                                    ▼
+  server tools                         client-only action
+  clock / math / web / file            visible timer starts locally
+```
+
+The app binds its API server to `127.0.0.1` on a random port, never the LAN. It uses a context-isolated preload bridge and does not expose Node.js APIs to page JavaScript.
+
+## Local development
+
+### Run the complete Mac desktop app
 
 ```bash
-cd Jarvis-AI
 npm ci
 npm run dev
 ```
 
-To produce a local universal DMG on macOS:
+### Run the backend and browser UI together
 
 ```bash
-npm run dist:mac
-# Output: release/Jarvis-AI-0.1.0-universal.dmg
+cp backend/.env.example backend/.env
+npm run server
+# Visit http://127.0.0.1:8787
 ```
 
-A browser-only preview remains available at [armahjudah93-hue.github.io/Jarvis-AI](https://armahjudah93-hue.github.io/Jarvis-AI/), but the downloadable desktop product is the macOS DMG.
+### Configure AI routing
 
-## Try the prototype
+Place secrets in `backend/.env` locally or your backend host's secret manager when deploying the service. Do not commit keys or put them in `app.js`, `api.js`, GitHub Pages, or the DMG source.
 
-- Type **“Open Chrome and pull up my email”** and press Enter.
-- Type **“Set focus mode for 45 minutes”** to see a protected system-change approval.
-- Type **“Send a status email to my team”** to see an external-action approval.
-- Upload or drag in an image, PDF, text file, spreadsheet, or document to start a simulated private analysis flow.
-- Select **Test wake word**, press `⌘/Ctrl + J`, or use **Speak** (where the browser supports Web Speech recognition).
-
-The command queue and voice-output preference are stored only in browser `localStorage`.
-
-## Product architecture
-
-A production implementation should split into two trust boundaries:
-
-```text
-Microphone / hotkey / upload / screen capture
-                  │
-                  ▼
-          Local desktop companion
-   wake word → STT → intent classifier → policy engine
-                  │                      │
-                  │                approval required?
-                  ▼                      ▼
-     local tools + optional cloud LLM    desktop confirmation
-                  │                      │
-                  └──── OS automation / analysis ────┘
-                               │
-                               ▼
-                      TTS + desktop UI updates
+```dotenv
+OPENAI_API_KEY=your_server_side_key
+OPENAI_MODEL=gpt-4.1-mini
+JARVIS_ALLOWED_ORIGINS=http://127.0.0.1:8787,https://your-ui.example
+JARVIS_ALLOW_LOCAL_FALLBACK=true
 ```
 
-### Recommended implementation layers
+When building a packaged Mac app, supply the key through the app's launch environment or run a separately managed backend. A production release should store a user-provided credential in the macOS Keychain and obtain consent before it is used; that settings flow is not implemented in this build.
 
-1. **Wake word and STT (on device)** — use a low-power hotword detector (for example, Porcupine/openWakeWord) and local Whisper or whisper.cpp. Keep the microphone stream on-device until the user has invoked the assistant.
-2. **Orchestrator** — turn transcribed speech into a typed intent and constrained action plan. The LLM can plan and explain; it should never receive unrestricted shell access.
-3. **Policy engine** — classify every tool request as read-only, reversible, privileged, destructive, or external. Require an explicit confirmation for sending, buying, deleting, credential access, device settings, and broad file actions. Use allowlists, scoped capabilities, and audit logs.
-4. **macOS tool adapter** — run AppleScript, Shortcuts, `NSWorkspace`, and other macOS-native plugins with the minimum rights. Keep simulated mouse/keyboard control as a last-resort, visibly announced capability, protected by macOS Accessibility permission and a just-in-time confirmation.
-5. **Analysis router** — process file metadata, OCR, image understanding, PDF/table extraction, and code/data analysis. Choose local models by default; only send content to a cloud model after a clear, per-source disclosure and user policy check.
-6. **Memory** — store preferences and approved facts locally, encrypt at rest, show an editable memory log, and never save sensitive material by default.
-7. **Voice output** — produce concise local TTS feedback for status updates, blockers, and completed actions.
+## API contract
 
-## Files
-
-- `index.html` — semantic application shell and accessible modal controls.
-- `styles.css` — responsive visual system, audio-style animation, desktop and mobile layouts.
-- `app.js` — deterministic intent routing, command safety gates, queue/activity behavior, voice API support, file intake, persisted UI preferences, and native-shell awareness.
-- `electron/main.cjs` — secure MacBook-only Electron main process, native menu, microphone policy, and window lifecycle.
-- `electron/preload.cjs` — minimal, context-isolated bridge between the native shell and UI.
-- `package.json` — universal macOS DMG configuration.
-- `.github/workflows/build-macos-dmg.yml` — macOS CI build that outputs the downloadable DMG.
-
-## Integration contract for a real local companion
-
-Replace the simulated `executePlan` path in `app.js` with a secure relative API such as `POST /api/actions`. A local companion should validate the action again rather than trusting client-side policy.
+### `POST /api/chat`
 
 ```json
 {
-  "requestId": "uuid",
-  "intent": "open_workspace",
-  "arguments": { "app": "Chrome", "target": "email" },
-  "risk": "read_only",
-  "approval": { "granted": false, "scope": "single_action" }
+  "message": "Set a timer for five minutes",
+  "history": [{ "role": "user", "content": "Previous request" }]
 }
 ```
 
-The companion should return structured progress events, never raw shell input. For cloud reasoning, pass only the minimum redacted context needed to formulate a plan and retain an audit record of the disclosure decision.
+The result is structured and only reports success after a tool has completed or a client action has been explicitly handed off:
+
+```json
+{
+  "status": "requires_client_action",
+  "orchestrator": "openai",
+  "message": "I prepared a 5 minute timer. Starting it now.",
+  "action": {
+    "name": "create_timer",
+    "risk": "low",
+    "result": { "durationSeconds": 300, "label": "Jarvis timer", "startsOnClient": true }
+  }
+}
+```
+
+### `POST /api/files/analyze`
+
+Accepts one user-selected `file` in multipart form data. Uploads are memory-bounded to 10 MB, not written to disk, and restricted to TXT, MD, CSV, JSON, PDF, PNG, JPG, JPEG, and WEBP. Text/CSV/JSON structure is analyzed locally; PDF/image content is acknowledged with accurate metadata-only limitations in this build.
+
+## Security boundaries
+
+- API credentials stay on the backend; browser JavaScript receives no secret.
+- CORS uses an explicit origin allowlist. It is an extra browser boundary—not authentication.
+- The backend accepts only the five allowlisted tool types. It never executes model-generated shell code.
+- Inputs, file size, tool arguments, math tokens, timer duration, and request rate are validated.
+- Request logs record tool/status metadata only; they do not log commands, file contents, or credentials.
+- Desktop actions beyond the approved tools are denied until a separately permissioned macOS execution layer is built.
+
+## Test and package
+
+```bash
+npm run verify
+npm test
+npm run dist:mac
+```
+
+`npm run dist:mac` must run on macOS and writes `release/Jarvis-AI-0.2.0-universal.dmg`. GitHub Actions uses a macOS runner to build and attach that DMG to the release.
+
+## Project map
+
+```text
+├── index.html / styles.css / app.js   # UI and actual-result state handling
+├── api.js                             # one browser-to-backend API client
+├── electron/                          # Mac shell and secure preload bridge
+├── backend/
+│   ├── .env.example                   # secret-free configuration template
+│   └── src/
+│       ├── server.cjs                 # Express API, CORS, rate limits, upload handling
+│       ├── orchestrator.cjs            # OpenAI function routing / bounded fallback
+│       └── tools.cjs                  # safe implementations of the five approved tools
+├── tests/tools.test.cjs               # parser and validation tests
+└── .github/workflows/                 # Pages and universal macOS DMG build
+```
