@@ -47,6 +47,10 @@ function buildMenu() {
           accelerator: 'Command+,',
           click: () => mainWindow?.webContents.send('jarvis:open-settings')
         },
+        {
+          label: 'Open JARVIS Data Folder',
+          click: () => shell.openPath(app.getPath('userData'))
+        },
         { type: 'separator' },
         { role: 'hide' },
         { role: 'hideOthers' },
@@ -91,7 +95,13 @@ app.whenReady().then(async () => {
 
   try {
     // The API is loopback-only and is started by the native app; it is never exposed to the LAN.
-    localServer = await startJarvisServer({ port: 0, host: '127.0.0.1' });
+    localServer = await startJarvisServer({
+      port: 0,
+      host: '127.0.0.1',
+      // A user-managed .env in Application Support can configure the model without
+      // embedding credentials in the app bundle or website source.
+      envFile: path.join(app.getPath('userData'), '.env')
+    });
     buildMenu();
     createWindow();
   } catch (error) {

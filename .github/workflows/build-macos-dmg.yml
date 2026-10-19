@@ -55,8 +55,8 @@ jobs:
       - name: Publish MacBook DMG release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.2.0
-          name: Jarvis AI for Mac v0.2.0
+          tag_name: v0.2.1
+          name: Jarvis AI for Mac v0.2.1
           prerelease: false
           generate_release_notes: true
           files: release/*.dmg

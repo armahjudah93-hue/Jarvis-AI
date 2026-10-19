@@ -71,7 +71,7 @@ JARVIS_ALLOWED_ORIGINS=http://127.0.0.1:8787,https://your-ui.example
 JARVIS_ALLOW_LOCAL_FALLBACK=true
 ```
 
-When building a packaged Mac app, supply the key through the app's launch environment or run a separately managed backend. A production release should store a user-provided credential in the macOS Keychain and obtain consent before it is used; that settings flow is not implemented in this build.
+For the packaged Mac app, create a `.env` file in **`~/Library/Application Support/Jarvis AI/.env`** with the same variables, then relaunch JARVIS. Use **JARVIS AI → Open JARVIS Data Folder** from the Mac menu to open that location. This keeps credentials out of the app bundle and website source, but this development convenience is not a substitute for Keychain storage; a production release should store a user-provided credential in the macOS Keychain with clear consent.
 
 ## API contract
 
@@ -120,7 +120,7 @@ npm test
 npm run dist:mac
 ```
 
-`npm run dist:mac` must run on macOS and writes `release/Jarvis-AI-0.2.0-universal.dmg`. GitHub Actions uses a macOS runner to build and attach that DMG to the release.
+`npm run dist:mac` must run on macOS and writes `release/Jarvis-AI-0.2.1-universal.dmg`. GitHub Actions uses a macOS runner to build and attach that DMG to the release.
 
 ## Project map
 
